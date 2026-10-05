@@ -1,6 +1,6 @@
 # MemDev
 
-MemDev is a developer-focused memory system for intentionally saving useful material encountered while browsing, then finding and revisiting it later. The project is being built as a web dashboard, a browser extension, and a backend API backed by PostgreSQL.
+MemDev is a developer-focused memory system for intentionally saving useful material encountered while browsing, then finding and revisiting it later. It helps developers and students capture and access useful information efficiently. The project is being built as a web dashboard, a browser extension, and a backend API backed by PostgreSQL.
 
 ## Project status
 
