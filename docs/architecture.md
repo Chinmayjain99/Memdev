@@ -20,3 +20,9 @@ The API derives user identity from verified authentication. Client-supplied user
 ## Delivery order
 
 Backend and database foundations come first, followed by authentication, memory operations, search, synchronization, API contracts, the dashboard, and extension integration. The implementation status and actual verification results are recorded in `docs/progress.md`.
+
+## Backend foundation (implemented)
+
+The backend is a TypeScript Express service. `backend/src/app.ts` composes the HTTP middleware and routes; `backend/src/server.ts` owns process startup and graceful shutdown. Configuration is parsed and validated centrally. PostgreSQL access uses the `pg` connection pool through a small database module; transactions use one checked-out client and always release it. The initial routes provide liveness (`GET /health`) and database readiness (`GET /health/database`). No authentication or product data APIs are implemented in this phase.
+
+The database schema is applied by tracked `node-pg-migrate` migrations. See [docs/database-schema.md](database-schema.md) for the current tables, constraints, indexes, cursor protocol, and deferred RLS decision.

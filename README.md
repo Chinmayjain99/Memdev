@@ -8,14 +8,14 @@ This repository starts from a clean baseline. Implementation status and verified
 
 ## Development prerequisites
 
-- Node.js 22 or newer and npm
+- Node.js 22.9 or newer and npm
 - PostgreSQL for database-backed development
 
-Copy `.env.example` to `.env` and fill in local-only values. Never commit `.env` or real credentials. Database migrations and setup instructions will be added with the backend database phase.
+Copy `backend/.env.example` to `backend/.env` and fill in local-only values. Never commit `.env` or real credentials.
 
 ## Development
 
-Application-specific development commands will be documented here as the backend and frontend are implemented. See [docs/development-workflow.md](docs/development-workflow.md) for the branch and checkpoint workflow.
+Install dependencies with `npm install`, copy `backend/.env.example` to `backend/.env`, and set local PostgreSQL credentials. Start the API with `npm run dev`. See [backend/README.md](backend/README.md) and [docs/development-workflow.md](docs/development-workflow.md) for setup and verification commands.
 
 ## Privacy and security
 
