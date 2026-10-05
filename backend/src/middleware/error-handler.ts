@@ -1,5 +1,6 @@
 import type { ErrorRequestHandler, Request, Response, NextFunction } from 'express';
 import { logger } from '../utils/logger.js';
+import { AuthError } from '../modules/auth/auth.service.js';
 
 export function notFound(_request: Request, response: Response, next: NextFunction): void {
   void next;
@@ -8,6 +9,10 @@ export function notFound(_request: Request, response: Response, next: NextFuncti
 
 export const errorHandler: ErrorRequestHandler = (error: unknown, _request, response, next) => {
   void next;
-  logger.error({ err: error }, 'Unhandled request error');
+  if (error instanceof AuthError) {
+    response.status(error.status).json({ error: { code: error.code, message: error.message } });
+    return;
+  }
+  logger.error({ name: error instanceof Error ? error.name : 'UnknownError' }, 'Unhandled request error');
   response.status(500).json({ error: { code: 'INTERNAL_SERVER_ERROR', message: 'Internal server error' } });
 };

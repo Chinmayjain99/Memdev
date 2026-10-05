@@ -17,7 +17,7 @@
 - Lint: passed.
 - Build: passed.
 - Database connectivity: verified successfully on 2026-10-06 using the existing read-only integration check and local configuration (credentials not displayed).
-- Next: review and publish this feature branch; wait for approval before the next feature phase.
+- The authentication phase is implemented on `codex/backend-auth`; verification and publication status are recorded below.
 
 ## Phase 2 — Database schema and migrations
 
@@ -29,4 +29,14 @@
 - Production build: passed.
 - Migration npm script and compiled runner: both verified against `memdev_test`; no pending migrations.
 - The local `memdev` application database was not modified.
-- Next: review and publish this feature branch; wait for approval before authentication or application APIs.
+- The local `memdev` application database was not modified.
+
+## Phase 3 — Authentication
+
+- Status: implemented on `codex/backend-auth`; email/password, JWT access authentication, rotating refresh sessions, replay family revocation, logout/logout-all, CSRF and cookie controls are implemented.
+- OAuth provider login/account linking and password reset remain deferred; no development auth bypass exists.
+- Schema migration 003 adds a nullable password hash and refresh-token family/replacement metadata.
+- Tests: passed (18 passed, 0 failed) using only the isolated `memdev_test` database.
+- Typecheck, lint, production build, and full dependency audit: passed; audit reported 0 vulnerabilities.
+- `backend/.env` received a locally generated `AUTH_JWT_SECRET`; it remains ignored and is not included in this branch. The database password was not displayed or changed.
+- Final diff review and staged secret checks passed. The feature remains isolated on `codex/backend-auth`; it has not been merged into `develop` or `main`.
