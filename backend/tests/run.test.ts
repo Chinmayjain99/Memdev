@@ -9,4 +9,5 @@ const { closeTestDatabase } = await import('./integration/test-db.js');
 await import('./unit/app.test.js');
 await import('./integration/database.test.js');
 await import('./integration/auth.test.js');
+await import('./integration/memory.test.js');
 after(closeTestDatabase);
