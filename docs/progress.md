@@ -16,5 +16,17 @@
 - Typecheck: passed.
 - Lint: passed.
 - Build: passed.
-- Database connectivity: not verified; no local `backend/.env` is present. The database integration test is read-only and will run when a password is configured.
+- Database connectivity: verified successfully on 2026-10-06 using the existing read-only integration check and local configuration (credentials not displayed).
 - Next: review and publish this feature branch; wait for approval before the next feature phase.
+
+## Phase 2 — Database schema and migrations
+
+- Status: implemented on `codex/database-schema`.
+- Schema migrations: two ordered `node-pg-migrate` migrations applied to the isolated `memdev_test` database and verified as repeatable.
+- Tests: passed (9 passed, 0 failed); schema fixtures are rolled back and no test targets `DB_NAME`.
+- Typecheck: passed.
+- Lint: passed.
+- Production build: passed.
+- Migration npm script and compiled runner: both verified against `memdev_test`; no pending migrations.
+- The local `memdev` application database was not modified.
+- Next: review and publish this feature branch; wait for approval before authentication or application APIs.

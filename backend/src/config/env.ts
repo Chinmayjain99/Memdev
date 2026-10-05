@@ -6,6 +6,7 @@ const environmentSchema = z.object({
   DB_HOST: z.string().trim().min(1).default('localhost'),
   DB_PORT: z.coerce.number().int().min(1).max(65_535).default(5432),
   DB_NAME: z.string().trim().min(1).default('memdev'),
+  DB_TEST_NAME: z.string().trim().min(1).default('memdev_test'),
   DB_USER: z.string().trim().min(1).default('postgres'),
   DB_PASSWORD: z.string().default(''),
   DB_CONNECTION_TIMEOUT_MS: z.coerce.number().int().min(100).max(30_000).default(3000),
