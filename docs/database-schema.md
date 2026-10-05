@@ -53,7 +53,7 @@ Row Level Security is deferred. The current connection pool does not establish a
 
 ## Atomic writes and change cursor
 
-A future memory mutation and its `memory_changes` insert must use one `withTransaction` call. Both writes commit together; if either fails, the transaction helper rolls the whole operation back. Before changing a user’s memory and allocating its event, the transaction must lock that user row (`SELECT id FROM users WHERE id = $1 FOR UPDATE`). Keep the lock until commit.
+Memory create, update, revisit, and soft-delete use one `withTransaction` call with their `memory_changes` insert. Both writes commit together; if either fails, the transaction helper rolls the whole operation back. Before changing a user’s memory and allocating its event, the transaction locks that user row (`SELECT id FROM users WHERE id = $1 FOR UPDATE`) and holds it until commit. This preserves per-user sequence ordering.
 
 `sequence_id` is a database-generated, globally increasing identity. Gaps are expected. Sync reads use `WHERE user_id = $1 AND sequence_id > $2 ORDER BY sequence_id`. The per-user row lock serializes mutations before identity allocation, ensuring a later committed event for that user receives a later cursor even when writes run concurrently. Cursor values are opaque; clients should persist the last returned sequence and must not infer that global gaps are missing events for their user.
 

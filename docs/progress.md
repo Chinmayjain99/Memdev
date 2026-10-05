@@ -29,7 +29,6 @@
 - Production build: passed.
 - Migration npm script and compiled runner: both verified against `memdev_test`; no pending migrations.
 - The local `memdev` application database was not modified.
-- The local `memdev` application database was not modified.
 
 ## Phase 3 — Authentication
 
@@ -40,3 +39,13 @@
 - Typecheck, lint, production build, and full dependency audit: passed; audit reported 0 vulnerabilities.
 - `backend/.env` received a locally generated `AUTH_JWT_SECRET`; it remains ignored and is not included in this branch. The database password was not displayed or changed.
 - Final diff review and staged secret checks passed. The feature remains isolated on `codex/backend-auth`; it has not been merged into `develop` or `main`.
+
+## Phase 4 — Memory API
+
+- Status: implemented on `codex/backend-memory-api`, based on `origin/develop` commit `3a14e93`.
+- Tests: passed (24 passed, 0 failed; 6 memory-specific integration tests) using only `memdev_test`.
+- Typecheck, lint, production build, and dependency audit: passed; audit reported 0 vulnerabilities.
+- The memory API scopes reads/writes by the verified request identity, writes change events transactionally under the user-row cursor lock, uses full-precision keyset pagination, optimistic version checks, soft deletion, and atomic revisit tracking.
+- No schema migration or new dependency was needed for this phase.
+- Read-only inspection found that the configured `memdev` database has a legacy schema that differs from the checked-in migrations (integer `user_id`, `content`/`personal_note` columns, and no `memory_changes` table). It has not been modified. Integration work targets `memdev_test`; applying the tracked schema to `memdev` will be a separate deliberate operation.
+- The feature remains isolated on `codex/backend-memory-api`; it is not merged into `develop` or `main`.

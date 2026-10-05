@@ -1,6 +1,7 @@
 import type { ErrorRequestHandler, Request, Response, NextFunction } from 'express';
 import { logger } from '../utils/logger.js';
 import { AuthError } from '../modules/auth/auth.service.js';
+import { MemoryApiError } from '../modules/memories/memory.service.js';
 
 export function notFound(_request: Request, response: Response, next: NextFunction): void {
   void next;
@@ -10,6 +11,10 @@ export function notFound(_request: Request, response: Response, next: NextFuncti
 export const errorHandler: ErrorRequestHandler = (error: unknown, _request, response, next) => {
   void next;
   if (error instanceof AuthError) {
+    response.status(error.status).json({ error: { code: error.code, message: error.message } });
+    return;
+  }
+  if (error instanceof MemoryApiError) {
     response.status(error.status).json({ error: { code: error.code, message: error.message } });
     return;
   }
