@@ -1,0 +1,11 @@
+{
+  "name": "memdev",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A private memory layer for developers on the web.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {},
+  "license": "UNLICENSED"
+}
