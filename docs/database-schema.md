@@ -10,9 +10,9 @@ The schema requires PostgreSQL 13 or newer. `pg_trgm` must be available to the P
 
 | Table | Purpose and important columns |
 | --- | --- |
-| `users` | UUID identity, optional email and display name, and server-managed creation/update timestamps. Email is unique case-insensitively when present. No password is stored. |
+| `users` | UUID identity, optional email and display name, nullable bcrypt `password_hash`, and server-managed creation/update timestamps. Email is unique case-insensitively when present. |
 | `oauth_accounts` | Provider account link to a user. A `(provider, provider_account_id)` unique constraint prevents the same external account from being assigned to multiple users. No provider tokens or credentials are stored here. |
-| `refresh_sessions` | User-owned session metadata with a unique 32-byte `token_hash`, expiry, and optional revocation time. Raw refresh tokens are not stored. |
+| `refresh_sessions` | User-owned session metadata with unique 32-byte `token_hash`, family and replacement linkage, expiry, and optional revocation time. Raw refresh tokens are not stored. |
 | `memories` | User-owned captures, content/source metadata, tags, topic/language, code flags, soft deletion, client/server timestamps, revisit metrics, version, and trigger-maintained search vector. |
 | `memory_changes` | Durable create/update/delete events with an identity `sequence_id`, user and memory ownership, version, and server timestamp. |
 
