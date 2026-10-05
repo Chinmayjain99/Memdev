@@ -4,8 +4,17 @@
   "private": true,
   "description": "A private memory layer for developers on the web.",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.9"
   },
-  "scripts": {},
+  "workspaces": ["backend"],
+  "scripts": {
+    "dev": "npm run dev --workspace @memdev/backend",
+    "build": "npm run build --workspace @memdev/backend",
+    "start": "npm run start --workspace @memdev/backend",
+    "test": "npm run test --workspace @memdev/backend",
+    "test:watch": "npm run test:watch --workspace @memdev/backend",
+    "typecheck": "npm run typecheck --workspace @memdev/backend",
+    "lint": "npm run lint --workspace @memdev/backend"
+  },
   "license": "UNLICENSED"
 }
