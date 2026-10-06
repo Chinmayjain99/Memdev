@@ -2,6 +2,7 @@ import type { ErrorRequestHandler, Request, Response, NextFunction } from 'expre
 import { logger } from '../utils/logger.js';
 import { AuthError } from '../modules/auth/auth.service.js';
 import { MemoryApiError } from '../modules/memories/memory.service.js';
+import { SyncApiError } from '../modules/sync/sync.service.js';
 
 export function notFound(_request: Request, response: Response, next: NextFunction): void {
   void next;
@@ -15,6 +16,10 @@ export const errorHandler: ErrorRequestHandler = (error: unknown, _request, resp
     return;
   }
   if (error instanceof MemoryApiError) {
+    response.status(error.status).json({ error: { code: error.code, message: error.message } });
+    return;
+  }
+  if (error instanceof SyncApiError) {
     response.status(error.status).json({ error: { code: error.code, message: error.message } });
     return;
   }

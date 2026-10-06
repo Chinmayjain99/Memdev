@@ -15,6 +15,9 @@ Successful memory responses use `{ "memory": { ... } }`, except `GET /memories`,
 | `PATCH /memories/:id` | Update allowed metadata using the current version in `If-Match`; return new `ETag`. |
 | `DELETE /memories/:id` | Soft-delete an owned memory; returns `204`. Repeated deletion remains `204`. |
 | `POST /memories/:id/revisit` | Atomically increment server-managed revisit metrics and return the updated memory/version. |
+| `GET /sync/bootstrap?limit=100&pageToken=...` | Return one authenticated snapshot page and its fixed change boundary. |
+| `GET /sync/changes?cursor=0&limit=100` | Pull this caller’s changes after the cursor (limit 1–500, default 100). |
+| `POST /sync/mutations` | Apply up to 25 authenticated, idempotent create/update/delete mutations. |
 
 For text captures, `captureType: "text"` requires nonblank `selectedText`. URL captures use `captureType: "url"` and an absolute HTTP(S) `sourceUrl`. Both support title, manual note, tags, topic, language, code metadata, page title/domain, and an optional client timestamp where appropriate. The client cannot set IDs, ownership, server timestamps, `version`, revisit counters, deletion state, or search internals.
 
@@ -38,7 +41,7 @@ Both ranked candidate lists and every final row are scoped by the verified token
 
 Each repository query filters by both memory ID and the verified user ID. Another user’s or a deleted memory’s ID returns the same `404 MEMORY_NOT_FOUND` response as an unavailable memory.
 
-Create, update, revisit, and soft-delete run in `withTransaction`. Each transaction locks the owner row before changing a memory and allocating a `memory_changes.sequence_id`; the memory and event commit or roll back together. Event operations are `create`, `update` (including revisit metric changes), and `delete`, with the resulting memory version. The sequence remains a future sync cursor; no sync endpoint is implemented here.
+Create, update, revisit, and soft-delete run in `withTransaction`. Each transaction locks the owner row before changing a memory and allocating a `memory_changes.sequence_id`; the memory and event commit or roll back together. Sync mutation transactions also commit their user-scoped idempotency result atomically with the memory and event. See [offline sync](offline-sync.md) for cursor, bootstrap, and retry semantics. Revisit events remain pull-visible but revisit is not an offline mutation.
 
 ## Errors
 
@@ -46,4 +49,4 @@ Errors use `{ "error": { "code": string, "message": string } }`. Invalid fields,
 
 ## Deferred phases
 
-Semantic/vector search, offline synchronization endpoints, frontend, browser extension, OAuth providers, and deployment are out of scope. The API uses the existing database-managed `search_vector` for lexical search and never exposes it.
+Semantic/vector search, frontend, browser extension, OAuth providers, and deployment remain deferred. The API uses the existing database-managed `search_vector` for lexical search and never exposes it.

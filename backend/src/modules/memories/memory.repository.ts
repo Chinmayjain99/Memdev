@@ -14,30 +14,33 @@ export async function lockUser(client: PoolClient, userId: string): Promise<bool
   return result.rowCount === 1;
 }
 
-export async function createMemory(client: PoolClient, userId: string, input: CreateMemoryInput): Promise<Memory> {
+export async function createMemory(client: PoolClient, userId: string, input: CreateMemoryInput, id?: string): Promise<Memory | null> {
   const result = await client.query<Memory>(
     `INSERT INTO memories (
-       user_id,capture_type,title,selected_text,manual_note,source_url,page_title,domain,tags,topic,language,
+       ${id ? 'id,' : ''}user_id,capture_type,title,selected_text,manual_note,source_url,page_title,domain,tags,topic,language,
        is_code,code_language,client_created_at
-     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+     ) VALUES (${id ? '$1,' : ''}${Array.from({ length: 14 }, (_, i) => `$${i + (id ? 2 : 1)}`).join(',')})
+     ${id ? 'ON CONFLICT (id) DO NOTHING' : ''}
      RETURNING ${memoryColumns}`,
-    [userId,input.captureType,input.title ?? null,input.selectedText ?? null,input.manualNote ?? null,
+    [...(id ? [id] : []),userId,input.captureType,input.title ?? null,input.selectedText ?? null,input.manualNote ?? null,
       input.sourceUrl ?? null,input.pageTitle ?? null,input.domain ?? null,input.tags ?? [],input.topic ?? null,
       input.language ?? null,input.isCode ?? false,input.codeLanguage ?? null,input.clientCreatedAt ?? null],
   );
   const memory = result.rows[0];
-  if (!memory) throw new Error('Memory insert returned no row');
-  return memory;
+  return memory ?? null;
 }
 
 export async function addMemoryChange(
   client: PoolClient,
   change: { userId: string; memoryId: string; operation: 'create' | 'update' | 'delete'; version: number },
-): Promise<void> {
-  await client.query(
-    'INSERT INTO memory_changes (user_id,memory_id,operation,version) VALUES ($1,$2,$3,$4)',
+): Promise<string> {
+  const result = await client.query<{ sequenceId: string }>(
+    'INSERT INTO memory_changes (user_id,memory_id,operation,version) VALUES ($1,$2,$3,$4) RETURNING sequence_id AS "sequenceId"',
     [change.userId,change.memoryId,change.operation,change.version],
   );
+  const inserted = result.rows[0];
+  if (!inserted) throw new Error('Memory change insert returned no cursor');
+  return inserted.sequenceId;
 }
 
 export async function listMemories(pool: Pool, userId: string, limit: number, cursor: PageCursor | undefined): Promise<(Memory & { cursorCreatedAt: string })[]> {

@@ -9,6 +9,18 @@ export class MemoryApiError extends Error {
   constructor(readonly status: number, readonly code: string, message: string) { super(message); }
 }
 
+export function normalizeMemoryUpdate(current: Pick<Memory, 'isCode' | 'codeLanguage'>, patch: UpdateMemoryInput): UpdateMemoryInput {
+  const safePatch: UpdateMemoryInput = patch.isCode === false && patch.codeLanguage === undefined
+    ? { ...patch, codeLanguage: null }
+    : patch;
+  const nextIsCode = safePatch.isCode ?? current.isCode;
+  const nextCodeLanguage = safePatch.codeLanguage === undefined ? current.codeLanguage : safePatch.codeLanguage;
+  if (!nextIsCode && nextCodeLanguage !== null) {
+    throw new MemoryApiError(400, 'INVALID_CODE_METADATA', 'Clear codeLanguage when isCode is false');
+  }
+  return safePatch;
+}
+
 export function createMemoryService(pool: Pool) {
   async function lockUser(client: PoolClient, userId: string): Promise<void> {
     if (!await repository.lockUser(client, userId)) throw new MemoryApiError(404, 'MEMORY_NOT_FOUND', 'Memory not found');
@@ -19,6 +31,7 @@ export function createMemoryService(pool: Pool) {
       return withTransaction(pool, async (client) => {
         await lockUser(client, userId);
         const memory = await repository.createMemory(client, userId, input);
+        if (!memory) throw new Error('Memory insert returned no row');
         await repository.addMemoryChange(client, { userId, memoryId: memory.id, operation: 'create', version: memory.version });
         return memory;
       });
@@ -47,14 +60,7 @@ export function createMemoryService(pool: Pool) {
         if (current.version !== expectedVersion) {
           throw new MemoryApiError(409, 'VERSION_CONFLICT', 'Memory has changed; fetch the latest version and retry');
         }
-        const safePatch: UpdateMemoryInput = patch.isCode === false && patch.codeLanguage === undefined
-          ? { ...patch, codeLanguage: null }
-          : patch;
-        const nextIsCode = safePatch.isCode ?? current.isCode;
-        const nextCodeLanguage = safePatch.codeLanguage === undefined ? current.codeLanguage : safePatch.codeLanguage;
-        if (!nextIsCode && nextCodeLanguage !== null) {
-          throw new MemoryApiError(400, 'INVALID_CODE_METADATA', 'Clear codeLanguage when isCode is false');
-        }
+        const safePatch = normalizeMemoryUpdate(current, patch);
         const memory = await repository.updateMemory(client, userId, memoryId, safePatch);
         await repository.addMemoryChange(client, { userId, memoryId, operation: 'update', version: memory.version });
         return memory;
