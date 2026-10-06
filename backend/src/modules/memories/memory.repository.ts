@@ -2,7 +2,7 @@ import type { Pool, PoolClient } from 'pg';
 import type { CreateMemoryInput, UpdateMemoryInput } from './memory.validators.js';
 import type { Memory, PageCursor } from './memory.types.js';
 
-const memoryColumns = `
+export const memoryColumns = `
   id, capture_type AS "captureType", title, selected_text AS "selectedText",
   manual_note AS "manualNote", source_url AS "sourceUrl", page_title AS "pageTitle",
   domain, tags, topic, language, is_code AS "isCode", code_language AS "codeLanguage",

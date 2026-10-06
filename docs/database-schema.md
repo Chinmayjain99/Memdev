@@ -59,6 +59,6 @@ Memory create, update, revisit, and soft-delete use one `withTransaction` call w
 
 ## Search preparation
 
-`memories.search_vector` is a stored, trigger-maintained `tsvector` using PostgreSQL’s `simple` text configuration for language-neutral tokenization. It combines title at weight A, tags at B, selected text at C, and domain at D. A GIN index supports future full-text queries. A `pg_trgm` GIN index on title prepares fuzzy title matching. Search queries, ranking, APIs, and semantic/vector search are not part of this phase.
+`memories.search_vector` is a stored, trigger-maintained `tsvector` using PostgreSQL’s `simple` text configuration for language-neutral tokenization. It combines title at weight A, tags at B, selected text at C, and domain at D. `memories_search_vector_idx` supports full-text candidate lookup; `memories_title_trigram_idx` supports fuzzy title lookup using `pg_trgm` similarity operators. The search API scopes both candidate queries to the authenticated user and active rows before ranking. It uses FTS plus title similarity/word similarity and RRF; it does not change this trigger, add an index, or store a second vector. Semantic/vector search remains deferred.
 
 The migration is forward-only in the application scripts. Although the migration library can run down migrations explicitly, no down/reset npm script is provided. The down operation intentionally leaves `pg_trgm` installed because the extension may be shared by other database objects.
