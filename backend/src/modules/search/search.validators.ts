@@ -17,7 +17,8 @@ export const searchQuerySchema = z.strictObject({
   created_to: dateTime.optional(),
   language: z.string().trim().min(1).max(100).optional(),
   is_code: z.enum(['true', 'false']).transform((value) => value === 'true').optional(),
-}).refine((query) => !query.created_from || !query.created_to || query.created_from <= query.created_to, {
+}).refine((query) => !query.created_from || !query.created_to ||
+  Date.parse(query.created_from) <= Date.parse(query.created_to), {
   path: ['created_to'],
   message: 'created_to must be on or after created_from',
 });

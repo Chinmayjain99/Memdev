@@ -48,6 +48,12 @@ describe('authenticated memory search', () => {
     assert.equal((await api(user).get().query({ limit: 51 })).status, 400);
     assert.equal((await api(user).get().query({ created_from: 'not-a-date' })).status, 400);
     assert.equal((await api(user).get().query({ created_from: '2026-05-02T00:00:00Z', created_to: '2026-05-01T00:00:00Z' })).status, 400);
+    assert.equal((await api(user).get().query({
+      created_from: '2026-05-01T23:00:00Z', created_to: '2026-05-02T00:00:00+02:00',
+    })).status, 400);
+    assert.equal((await api(user).get().query({
+      created_from: '2026-05-02T00:00:00+02:00', created_to: '2026-05-01T23:00:00Z',
+    })).status, 200);
     assert.equal((await api(user).get().query({ tags: ',,' })).status, 400);
   });
 
