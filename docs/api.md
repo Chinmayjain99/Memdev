@@ -10,6 +10,7 @@ Successful memory responses use `{ "memory": { ... } }`, except `GET /memories`,
 | --- | --- |
 | `POST /memories` | Create a text or URL capture; returns `201`, the memory, and its version `ETag`. |
 | `GET /memories?limit=20&cursor=...` | List only the caller’s active memories. `limit` is 1–100. |
+| `GET /memories/search` | Search or filter the caller’s active memories with PostgreSQL full-text search and title fuzzy matching. |
 | `GET /memories/:id` | Return one active memory owned by the caller, with `ETag`. |
 | `PATCH /memories/:id` | Update allowed metadata using the current version in `If-Match`; return new `ETag`. |
 | `DELETE /memories/:id` | Soft-delete an owned memory; returns `204`. Repeated deletion remains `204`. |
@@ -25,6 +26,14 @@ Listing uses keyset pagination over `created_at DESC, id ASC`, matching the exis
 
 Create/detail/update/revisit responses include a quoted numeric `ETag`, such as `"3"`. `PATCH` requires that value in `If-Match`. A missing header returns `428 PRECONDITION_REQUIRED`; a stale version returns `409 VERSION_CONFLICT`. The server increments `version`; clients never choose it. Setting `isCode` to false without a `codeLanguage` value clears the existing language to satisfy the schema constraint.
 
+## Search
+
+`GET /memories/search` accepts optional `q` (up to 200 characters), `page` (1–2000), and `limit` (1–50), plus `domain`, comma-separated `tags` (up to 10), `topic`, `capture_type`, `created_from`, `created_to`, `language`, and `is_code`. Dates are ISO timestamps with an explicit timezone. All supplied filters are combined; a tag filter matches memories containing any requested tag. Unsupported or malformed parameters return `400`.
+
+The response is `{ "memories": [...], "page": number, "limit": number, "hasMore": boolean, "nextPage": number | null }`. An omitted or blank `q` performs a filtered listing ordered by `created_at DESC, id ASC`; it does not invoke full-text or trigram matching. Non-empty `q` searches the trigger-maintained weighted `search_vector` and fuzzy-matches titles. PostgreSQL ranks each source independently; the API combines them with reciprocal rank fusion using `k=60`. Results tie-break by UUID. Raw scores are not exposed.
+
+Both ranked candidate lists and every final row are scoped by the verified token user ID and exclude soft-deleted memories. Pages are deterministic page-number pages over a bounded union of at most 1,000 full-text and 1,000 fuzzy candidates; `hasMore` applies within that candidate window. Inserts or updates between separate requests can change page membership. See [search behavior and limitations](search.md).
+
 ## Ownership, transactions, and change events
 
 Each repository query filters by both memory ID and the verified user ID. Another user’s or a deleted memory’s ID returns the same `404 MEMORY_NOT_FOUND` response as an unavailable memory.
@@ -37,4 +46,4 @@ Errors use `{ "error": { "code": string, "message": string } }`. Invalid fields,
 
 ## Deferred phases
 
-Search, offline synchronization endpoints, frontend, browser extension, OAuth providers, and deployment are out of scope. The database trigger continues maintaining `search_vector`, but the API does not expose it or execute search queries.
+Semantic/vector search, offline synchronization endpoints, frontend, browser extension, OAuth providers, and deployment are out of scope. The API uses the existing database-managed `search_vector` for lexical search and never exposes it.

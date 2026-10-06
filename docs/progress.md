@@ -49,3 +49,13 @@
 - No schema migration or new dependency was needed for this phase.
 - Read-only inspection found that the configured `memdev` database has a legacy schema that differs from the checked-in migrations (integer `user_id`, `content`/`personal_note` columns, and no `memory_changes` table). It has not been modified. Integration work targets `memdev_test`; applying the tracked schema to `memdev` will be a separate deliberate operation.
 - The feature remains isolated on `codex/backend-memory-api`; it is not merged into `develop` or `main`.
+
+## Phase 5 — Search
+
+- Status: implemented on `codex/backend-search`, based on Memory API merge `2b75a6c` from `origin/develop`.
+- Existing weighted `search_vector`, `pg_trgm`, FTS GIN index, title trigram GIN index, and per-user domain/created indexes were inspected and retained; no schema migration was needed.
+- Search scopes FTS and fuzzy candidate lists by the verified user identity and active rows before ranking. It uses weighted PostgreSQL FTS, title trigram matching, RRF (`k=60`), metadata filters, and bounded deterministic page-number pagination.
+- Tests: passed (31 passed, 0 failed; 7 search-specific tests including RRF and isolation) using only `memdev_test`.
+- Typecheck, lint, production build, and dependency audit: passed; audit reported 0 vulnerabilities.
+- The legacy `memdev` database was not modified. Semantic/vector search, sync, frontend, extension, OAuth providers, and deployment remain deferred.
+- Documentation: `docs/api.md`, `docs/search.md`, `docs/architecture.md`, `docs/database-schema.md`, `docs/progress.md`, and `backend/README.md` updated.
