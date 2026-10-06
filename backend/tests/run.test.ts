@@ -12,4 +12,5 @@ await import('./integration/database.test.js');
 await import('./integration/auth.test.js');
 await import('./integration/memory.test.js');
 await import('./integration/search.test.js');
+await import('./integration/sync.test.js');
 after(closeTestDatabase);

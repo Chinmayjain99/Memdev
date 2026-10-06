@@ -57,5 +57,17 @@
 - Search scopes FTS and fuzzy candidate lists by the verified user identity and active rows before ranking. It uses weighted PostgreSQL FTS, title trigram matching, RRF (`k=60`), metadata filters, and bounded deterministic page-number pagination.
 - Tests: passed (31 passed, 0 failed; 7 search-specific tests including RRF and isolation) using only `memdev_test`.
 - Typecheck, lint, production build, and dependency audit: passed; audit reported 0 vulnerabilities.
-- The legacy `memdev` database was not modified. Semantic/vector search, sync, frontend, extension, OAuth providers, and deployment remain deferred.
+- The legacy `memdev` database was not modified. Semantic/vector search, frontend, extension, OAuth providers, and deployment remain deferred.
 - Documentation: `docs/api.md`, `docs/search.md`, `docs/architecture.md`, `docs/database-schema.md`, `docs/progress.md`, and `backend/README.md` updated.
+
+## Phase 6 — Offline Sync
+
+- Status: implemented on `codex/backend-sync`, based on `origin/develop` at `12abf2f46fa17f11707dfa6786c56eb0fca49e98`.
+- Added authenticated `/sync/bootstrap`, `/sync/changes`, and `/sync/mutations` endpoints. Bootstrap locks the authenticated user's row while reading both snapshot and cursor boundary; pull uses repeatable user-scoped cursor queries; push batches are bounded to 25 individually atomic mutations.
+- Migration 004 adds `sync_mutations` with a per-user `(user_id, mutation_id)` key, SHA-256 request fingerprint, outcome/version fields, and ownership-safe optional memory reference. A mutation, change event, and idempotency record commit together.
+- Create/update/delete are supported with client UUIDs and optimistic versions. Revisit remains server-side; revisit changes are pull-visible but counters are not accepted from offline clients.
+- Legacy `memdev` is not used. Integration tests are constrained by the existing harness to `DB_TEST_NAME` (`memdev_test`).
+- Tests: passed (39 passed, 0 failed), using only `memdev_test`.
+- Typecheck, lint, production build, and `npm audit` passed; audit reported 0 vulnerabilities.
+- No dependencies were added; `backend/.env` remains ignored and untracked. Main and develop remain unchanged.
+- Push results will be recorded after publication of the feature branch.

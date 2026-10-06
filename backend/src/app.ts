@@ -9,6 +9,7 @@ import { createHealthRouter } from './modules/health/health.routes.js';
 import { createAuthRouter } from './modules/auth/auth.routes.js';
 import { createMemoryRouter } from './modules/memories/memory.routes.js';
 import { createSearchRouter } from './modules/search/search.routes.js';
+import { createSyncRouter } from './modules/sync/sync.routes.js';
 import { config as defaultConfig } from './config/index.js';
 
 export function createApp(pool: Pool, config: AppConfig = defaultConfig) {
@@ -25,6 +26,7 @@ export function createApp(pool: Pool, config: AppConfig = defaultConfig) {
   app.use('/auth', createAuthRouter(pool, config));
   app.use('/memories/search', createSearchRouter(pool, config));
   app.use('/memories', createMemoryRouter(pool, config));
+  app.use('/sync', createSyncRouter(pool, config));
   app.use(notFound);
   app.use(errorHandler);
   return app;

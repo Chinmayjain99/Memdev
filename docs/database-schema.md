@@ -15,6 +15,7 @@ The schema requires PostgreSQL 13 or newer. `pg_trgm` must be available to the P
 | `refresh_sessions` | User-owned session metadata with unique 32-byte `token_hash`, family and replacement linkage, expiry, and optional revocation time. Raw refresh tokens are not stored. |
 | `memories` | User-owned captures, content/source metadata, tags, topic/language, code flags, soft deletion, client/server timestamps, revisit metrics, version, and trigger-maintained search vector. |
 | `memory_changes` | Durable create/update/delete events with an identity `sequence_id`, user and memory ownership, version, and server timestamp. |
+| `sync_mutations` | User-scoped idempotency records that atomically retain each pushed mutation’s request hash and applied/conflict/not-found outcome. |
 
 All user references cascade when a user is deleted. Memories have a unique `(user_id, id)` key in addition to the UUID primary key so `memory_changes` can enforce a composite foreign key to the same owner. Deleting a memory physically cascades its change rows; normal deletion is represented by a tombstone on the memory and a `delete` event, so sync history remains available while the tombstone exists.
 
@@ -42,6 +43,7 @@ Refresh token hashes are `bytea` values constrained to 32 bytes (for a SHA-256 d
 | `memory_changes_pkey` | Globally unique identity cursor. |
 | `memory_changes_user_cursor_idx` | Reads one user’s changes after a cursor. |
 | `memory_changes_memory_id_idx` | Looks up the change history for one memory. |
+| `sync_mutations_pkey` | Unique mutation ID within an authenticated user’s namespace and fast retry lookup. |
 
 The schema also defines user, capture, version, revisit, deletion-state, and timestamp checks listed above. Foreign keys connect OAuth accounts, sessions, memories, and change events to their owning user; the composite change-to-memory foreign key enforces matching ownership.
 
@@ -61,4 +63,6 @@ Memory create, update, revisit, and soft-delete use one `withTransaction` call w
 
 `memories.search_vector` is a stored, trigger-maintained `tsvector` using PostgreSQL’s `simple` text configuration for language-neutral tokenization. It combines title at weight A, tags at B, selected text at C, and domain at D. `memories_search_vector_idx` supports full-text candidate lookup; `memories_title_trigram_idx` supports fuzzy title lookup using `pg_trgm` similarity operators. The search API scopes both candidate queries to the authenticated user and active rows before ranking. It uses FTS plus title similarity/word similarity and RRF; it does not change this trigger, add an index, or store a second vector. Semantic/vector search remains deferred.
 
-The migration is forward-only in the application scripts. Although the migration library can run down migrations explicitly, no down/reset npm script is provided. The down operation intentionally leaves `pg_trgm` installed because the extension may be shared by other database objects.
+Migration 004 adds `sync_mutations`; its `(user_id, mutation_id)` primary key scopes idempotency keys per user. Applied outcomes reference their event cursor and same-owner memory; conflicts that might refer to another user’s UUID store no memory ID. It duplicates no memory content. The migration is forward-only in the application scripts. Although the migration library can run down migrations explicitly, no down/reset npm script is provided. The down operation intentionally leaves `pg_trgm` installed because the extension may be shared by other database objects.
+
+See [offline sync protocol](offline-sync.md) for the bootstrap lock, pull semantics, and client cursor behavior.

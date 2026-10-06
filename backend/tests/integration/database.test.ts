@@ -37,7 +37,7 @@ describe('database schema', () => {
   it('applies the tracked migration repeatably', async () => {
     await prepareTestDatabase();
     const result = await testPool.query<{ count: string }>('SELECT count(*)::text AS count FROM schema_migrations');
-    assert.equal(result.rows[0]?.count, '3');
+    assert.equal(result.rows[0]?.count, '4');
   });
 
   it('creates the expected tables, constraints, foreign keys, indexes, and extension', async () => {
@@ -56,10 +56,10 @@ describe('database schema', () => {
       `SELECT tablename FROM pg_tables
        WHERE schemaname = current_schema()
          AND tablename = ANY($1::text[])`,
-      [['users', 'oauth_accounts', 'refresh_sessions', 'memories', 'memory_changes']],
+      [['users', 'oauth_accounts', 'refresh_sessions', 'memories', 'memory_changes', 'sync_mutations']],
     );
     assert.deepEqual(tables.rows.map(({ tablename }) => tablename).sort(),
-      ['memories', 'memory_changes', 'oauth_accounts', 'refresh_sessions', 'users']);
+      ['memories', 'memory_changes', 'oauth_accounts', 'refresh_sessions', 'sync_mutations', 'users']);
 
     const constraints = await testPool.query<{ conname: string }>(
       `SELECT conname FROM pg_constraint

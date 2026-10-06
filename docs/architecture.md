@@ -7,10 +7,10 @@ MemDev has three application surfaces: a browser extension for intentional captu
 ## Planned request flow
 
 ```text
-Browser extension -> API -> PostgreSQL
-        |               ^
-        v               |
-     IndexedDB      Web dashboard
+Browser extension <-> IndexedDB <-> Sync API <-> PostgreSQL
+                                      ^              ^
+                                      |              |
+                                Web dashboard ------+
 ```
 
 ## Security boundary
@@ -23,6 +23,6 @@ Backend and database foundations come first, followed by authentication, memory 
 
 ## Backend foundation (implemented)
 
-The backend is a TypeScript Express service. `backend/src/app.ts` composes HTTP middleware and routes; `backend/src/server.ts` owns startup and shutdown. Configuration is parsed and validated centrally. PostgreSQL transactions use a checked-out client. Health endpoints provide liveness/readiness; auth routes provide registration, login, refresh, logout, logout-all, and account lookup. Authenticated memory routes provide CRUD, soft deletion, and revisit tracking. Every memory query uses the verified `request.auth.id`. Mutations lock the user row and write a `memory_changes` event in the same transaction to preserve per-user cursor ordering. The search module scopes full-text and trigram candidate sets by that identity, fuses their independent ranks, and returns bounded pages. Semantic/vector search, offline sync, frontend, extension, OAuth providers, and deployment remain deferred.
+The backend is a TypeScript Express service. `backend/src/app.ts` composes HTTP middleware and routes; `backend/src/server.ts` owns startup and shutdown. Configuration is parsed and validated centrally. PostgreSQL transactions use a checked-out client. Health endpoints provide liveness/readiness; auth routes provide registration, login, refresh, logout, logout-all, and account lookup. Authenticated memory routes provide CRUD, soft deletion, and revisit tracking. Every memory query uses the verified `request.auth.id`. Mutations lock the user row and write a `memory_changes` event in the same transaction to preserve per-user cursor ordering. The sync module provides a locked bootstrap snapshot, bounded user-scoped pull, and idempotent version-aware create/update/delete pushes. The search module scopes full-text and trigram candidate sets by identity, fuses their independent ranks, and returns bounded pages. Semantic/vector search, frontend, extension, OAuth providers, and deployment remain deferred.
 
 The database schema is applied by tracked `node-pg-migrate` migrations. See [docs/database-schema.md](database-schema.md) for the current tables, constraints, indexes, cursor protocol, and deferred RLS decision.
