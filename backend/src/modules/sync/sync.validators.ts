@@ -7,6 +7,10 @@ export const changesQuerySchema = z.strictObject({
   cursor: z.string().regex(/^(0|[1-9]\d{0,18})$/).refine((value) => BigInt(value) <= 9_223_372_036_854_775_807n),
   limit: z.coerce.number().int().min(1).max(500).default(100),
 });
+export const bootstrapQuerySchema = z.strictObject({
+  limit: z.coerce.number().int().min(1).max(500).default(100),
+  pageToken: z.string().min(1).max(2048).optional(),
+});
 const createMutation = z.strictObject({ mutationId: uuid, operation: z.literal('create'), memoryId: uuid, memory: createMemorySchema });
 const updateMutation = z.strictObject({ mutationId: uuid, operation: z.literal('update'), memoryId: uuid, baseVersion: version, patch: updateMemorySchema });
 const deleteMutation = z.strictObject({ mutationId: uuid, operation: z.literal('delete'), memoryId: uuid, baseVersion: version });

@@ -1,7 +1,7 @@
 import type { Request, RequestHandler, Response } from 'express';
 import type { Pool } from 'pg';
 import { createSyncService } from './sync.service.js';
-import { changesQuerySchema, mutationsBodySchema } from './sync.validators.js';
+import { bootstrapQuerySchema, changesQuerySchema, mutationsBodySchema } from './sync.validators.js';
 
 export function createSyncController(pool: Pool) {
   const service = createSyncService(pool);
@@ -9,7 +9,9 @@ export function createSyncController(pool: Pool) {
     bootstrap: async (request: Request, response: Response, next: (error?: unknown) => void) => {
       const userId = authenticatedId(request, response);
       if (!userId) return;
-      try { response.json(await service.bootstrap(userId)); }
+      const query = bootstrapQuerySchema.safeParse(request.query);
+      if (!query.success) { invalid(response); return; }
+      try { response.json(await service.bootstrap(userId, query.data.limit, query.data.pageToken)); }
       catch (error) { next(error); }
     },
     changes: async (request: Request, response: Response, next: (error?: unknown) => void) => {
@@ -28,7 +30,8 @@ export function createSyncController(pool: Pool) {
       try {
         const result = await service.mutations(userId, body.data.mutations);
         const hasConflict = result.results.some((item) => item.status === 'conflict');
-        response.status(hasConflict ? 409 : 200).json(result);
+        const hasInvalidMutation = result.results.some((item) => item.status === 'invalid');
+        response.status(hasConflict ? 409 : hasInvalidMutation ? 400 : 200).json(result);
       }
       catch (error) { next(error); }
     },

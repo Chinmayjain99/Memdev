@@ -11,9 +11,18 @@ export type SyncMemoryRow = {
 
 const syncMemoryColumns = `${memoryColumns},is_deleted AS "isDeleted",deleted_at AS "deletedAt"`;
 
-export async function listSnapshot(client: PoolClient, userId: string): Promise<SyncMemoryRow[]> {
-  const result = await client.query<SyncMemoryRow>(
-    `SELECT ${syncMemoryColumns} FROM memories WHERE user_id=$1 ORDER BY created_at,id`, [userId]);
+export type SnapshotRow = SyncMemoryRow & { cursorCreatedAt: string };
+
+export async function listSnapshotPage(db: Pool | PoolClient, userId: string, limit: number,
+  after?: { createdAt: string; id: string }): Promise<SnapshotRow[]> {
+  const result = await db.query<SnapshotRow>(
+    `SELECT ${syncMemoryColumns},
+            to_char(created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "cursorCreatedAt"
+     FROM memories
+     WHERE user_id=$1 AND ($2::timestamptz IS NULL OR created_at < $2::timestamptz
+       OR (created_at=$2::timestamptz AND id > $3::uuid))
+     ORDER BY created_at DESC,id ASC LIMIT $4`,
+    [userId,after?.createdAt ?? null,after?.id ?? null,limit + 1]);
   return result.rows;
 }
 

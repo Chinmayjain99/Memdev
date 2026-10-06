@@ -67,7 +67,10 @@
 - Migration 004 adds `sync_mutations` with a per-user `(user_id, mutation_id)` key, SHA-256 request fingerprint, outcome/version fields, and ownership-safe optional memory reference. A mutation, change event, and idempotency record commit together.
 - Create/update/delete are supported with client UUIDs and optimistic versions. Revisit remains server-side; revisit changes are pull-visible but counters are not accepted from offline clients.
 - Legacy `memdev` is not used. Integration tests are constrained by the existing harness to `DB_TEST_NAME` (`memdev_test`).
-- Tests: passed (39 passed, 0 failed), using only `memdev_test`.
+- Tests: passed (47 passed, 0 failed; 16 sync integration tests), using only `memdev_test`.
 - Typecheck, lint, production build, and `npm audit` passed; audit reported 0 vulnerabilities.
 - No dependencies were added; `backend/.env` remains ignored and untracked. Main and develop remain unchanged.
+- Final review hardened idempotency fingerprints for transformed dates and ensures state-dependent invalid mutations do not hide other per-item batch outcomes. Added tests for concurrent same-ID retries, partial batches, dependent batch ordering, stale/duplicate deletes, revisit pull behavior, and search indexing.
+- Final review hardened idempotency fingerprints for transformed dates and ensures state-dependent invalid mutations do not hide other per-item batch outcomes. Added tests for concurrent same-ID retries, bounded bootstrap paging/races, partial batches, dependent batch ordering, stale/duplicate deletes, revisit pull behavior, and search indexing.
+- Bootstrap is bounded and statelessly paginated; every page carries the first page's locked cursor boundary, and clients pull later changes after applying all pages.
 - Feature branch pushed to `origin/codex/backend-sync`; no PR was created and no merge was performed.

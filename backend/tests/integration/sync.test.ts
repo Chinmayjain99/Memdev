@@ -71,6 +71,46 @@ describe('offline synchronization API', () => {
     assert.equal(changes.body.hasMore, false);
   });
 
+  it('pages a bounded bootstrap while the fixed boundary catches writes between pages', async () => {
+    const user = await account(); const owner = api(user);
+    const ids = [randomUUID(), randomUUID(), randomUUID()];
+    for (const [index, id] of ids.entries()) {
+      const response = await owner.post('/sync/mutations').send({ mutations: [
+        { mutationId: randomUUID(), operation: 'create', memoryId: id, memory: newText(`paged item ${index}`) },
+      ] });
+      assert.equal(response.status, 200);
+    }
+    let page = await owner.get('/sync/bootstrap').query({ limit: 1 });
+    assert.equal(page.status, 200);
+    assert.equal(page.body.hasMore, true);
+    const boundary = page.body.cursor as string;
+    const firstToken = page.body.nextPageToken as string;
+    assert.ok(firstToken);
+    assert.equal((await owner.get('/sync/bootstrap').query({ limit: 1, pageToken: 'invalid' })).status, 400);
+
+    await owner.post('/sync/mutations').send({ mutations: [
+      { mutationId: randomUUID(), operation: 'update', memoryId: ids[1], baseVersion: 1, patch: { title: 'changed after boundary' } },
+      { mutationId: randomUUID(), operation: 'delete', memoryId: ids[2], baseVersion: 1 },
+      { mutationId: randomUUID(), operation: 'create', memoryId: randomUUID(), memory: newText('created after boundary') },
+    ] });
+
+    const snapshotIds = new Set<string>();
+    for (const memory of [...page.body.memories, ...page.body.tombstones]) snapshotIds.add(memory.id as string);
+    let token: string | null = firstToken;
+    while (token) {
+      page = await owner.get('/sync/bootstrap').query({ limit: 1, pageToken: token });
+      assert.equal(page.status, 200);
+      assert.equal(page.body.cursor, boundary);
+      for (const memory of [...page.body.memories, ...page.body.tombstones]) snapshotIds.add(memory.id as string);
+      token = page.body.nextPageToken as string | null;
+    }
+    assert.ok(ids.every((id) => snapshotIds.has(id)));
+    const tail = await owner.get('/sync/changes').query({ cursor: boundary });
+    assert.ok(tail.body.changes.some((change: { memoryId: string; operation: string }) => change.memoryId === ids[1] && change.operation === 'update'));
+    assert.ok(tail.body.changes.some((change: { memoryId: string; operation: string }) => change.memoryId === ids[2] && change.operation === 'delete'));
+    assert.equal(tail.body.changes.length, 3);
+  });
+
   it('replays exact creates without duplicating memory, version, or change events', async () => {
     const user = await account();
     const owner = api(user);
@@ -86,6 +126,90 @@ describe('offline synchronization API', () => {
     assert.equal(changeCount.rows[0]?.count, '1');
     const reused = await owner.post('/sync/mutations').send({ mutations: [{ ...mutation, memory: newText('different payload') }] });
     assert.equal(reused.body.results[0].code, 'IDEMPOTENCY_KEY_REUSED');
+    const timestamped = { mutationId: randomUUID(), operation: 'create', memoryId: randomUUID(),
+      memory: { ...newText('same text'), clientCreatedAt: '2026-01-01T00:00:00.000Z' } };
+    assert.equal((await owner.post('/sync/mutations').send({ mutations: [timestamped] })).body.results[0].status, 'applied');
+    const changedTimestamp = { ...timestamped, memory: { ...timestamped.memory, clientCreatedAt: '2026-01-02T00:00:00.000Z' } };
+    const dateReuse = await owner.post('/sync/mutations').send({ mutations: [changedTimestamp] });
+    assert.equal(dateReuse.status, 409);
+    assert.equal(dateReuse.body.results[0].code, 'IDEMPOTENCY_KEY_REUSED');
+  });
+
+  it('serializes concurrent retries of the same user-scoped mutation ID', async () => {
+    const user = await account(); const owner = api(user);
+    const mutation = { mutationId: randomUUID(), operation: 'create', memoryId: randomUUID(), memory: newText('same retry') };
+    const [first, second] = await Promise.all([
+      owner.post('/sync/mutations').send({ mutations: [mutation] }),
+      owner.post('/sync/mutations').send({ mutations: [mutation] }),
+    ]);
+    assert.equal(first.status, 200);
+    assert.equal(second.status, 200);
+    assert.equal(first.body.results[0].cursor, second.body.results[0].cursor);
+    const replayFlags = [first.body.results[0].replayed, second.body.results[0].replayed];
+    assert.ok(replayFlags.includes(undefined));
+    assert.ok(replayFlags.includes(true));
+    const counts = await testPool.query<{ memories: string; changes: string }>(
+      `SELECT (SELECT count(*)::text FROM memories WHERE user_id=$1 AND id=$2) AS memories,
+              (SELECT count(*)::text FROM memory_changes WHERE user_id=$1 AND memory_id=$2) AS changes`,
+      [user.id, mutation.memoryId]);
+    assert.equal(counts.rows[0]?.memories, '1');
+    assert.equal(counts.rows[0]?.changes, '1');
+  });
+
+  it('returns every sequential batch result when one state-dependent update is invalid', async () => {
+    const user = await account(); const owner = api(user);
+    const existingId = randomUUID();
+    await owner.post('/sync/mutations').send({ mutations: [
+      { mutationId: randomUUID(), operation: 'create', memoryId: existingId, memory: newText('not code') },
+    ] });
+    const firstId = randomUUID(); const lastId = randomUUID();
+    const batch = await owner.post('/sync/mutations').send({ mutations: [
+      { mutationId: randomUUID(), operation: 'create', memoryId: firstId, memory: newText('first') },
+      { mutationId: randomUUID(), operation: 'update', memoryId: existingId, baseVersion: 1, patch: { codeLanguage: 'typescript' } },
+      { mutationId: randomUUID(), operation: 'create', memoryId: lastId, memory: newText('last') },
+    ] });
+    assert.equal(batch.status, 400);
+    assert.deepEqual(batch.body.results.map((result: { status: string }) => result.status), ['applied', 'invalid', 'applied']);
+    assert.ok(batch.body.results[1].code);
+    assert.equal((await owner.get(`/memories/${firstId}`)).status, 200);
+    assert.equal((await owner.get(`/memories/${lastId}`)).status, 200);
+  });
+
+  it('continues after a conflict and returns an outcome for each partial batch item', async () => {
+    const user = await account(); const owner = api(user); const targetId = randomUUID();
+    await owner.post('/sync/mutations').send({ mutations: [
+      { mutationId: randomUUID(), operation: 'create', memoryId: targetId, memory: newText('target') },
+    ] });
+    const firstId = randomUUID(); const lastId = randomUUID();
+    const mutations = [
+      { mutationId: randomUUID(), operation: 'create', memoryId: firstId, memory: newText('first item') },
+      { mutationId: randomUUID(), operation: 'update', memoryId: targetId, baseVersion: 9, patch: { title: 'stale' } },
+      { mutationId: randomUUID(), operation: 'create', memoryId: lastId, memory: newText('last item') },
+    ];
+    const response = await owner.post('/sync/mutations').send({ mutations });
+    assert.equal(response.status, 409);
+    assert.deepEqual(response.body.results.map((result: { status: string }) => result.status), ['applied', 'conflict', 'applied']);
+    assert.equal((await owner.get(`/memories/${firstId}`)).status, 200);
+    assert.equal((await owner.get(`/memories/${lastId}`)).status, 200);
+    const replay = await owner.post('/sync/mutations').send({ mutations });
+    assert.equal(replay.status, 409);
+    assert.ok(replay.body.results.every((result: { replayed?: boolean }) => result.replayed === true));
+  });
+
+  it('processes dependent mutations sequentially in array order', async () => {
+    const user = await account(); const owner = api(user); const memoryId = randomUUID();
+    await owner.post('/sync/mutations').send({ mutations: [
+      { mutationId: randomUUID(), operation: 'create', memoryId, memory: newText('ordered') },
+    ] });
+    const response = await owner.post('/sync/mutations').send({ mutations: [
+      { mutationId: randomUUID(), operation: 'update', memoryId, baseVersion: 1, patch: { title: 'first update' } },
+      { mutationId: randomUUID(), operation: 'update', memoryId, baseVersion: 2, patch: { title: 'second update' } },
+    ] });
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body.results.map((result: { version: number }) => result.version), [2, 3]);
+    const final = await owner.get(`/memories/${memoryId}`);
+    assert.equal(final.body.memory.version, 3);
+    assert.equal(final.body.memory.title, 'second update');
   });
 
   it('isolates mutation IDs and memory UUID collisions across users', async () => {
@@ -113,6 +237,16 @@ describe('offline synchronization API', () => {
     assert.equal(changesB.body.changes.length, 1);
     assert.notEqual(changesA.body.changes[0].memoryId, changesB.body.changes[0].memoryId);
     assert.equal((await b.get('/sync/bootstrap')).body.memories.some((memory: { id: string }) => memory.id === memoryId), false);
+    const foreignUpdate = await b.post('/sync/mutations').send({ mutations: [
+      { mutationId: randomUUID(), operation: 'update', memoryId, baseVersion: 1, patch: { title: 'foreign edit' } },
+    ] });
+    const foreignDelete = await b.post('/sync/mutations').send({ mutations: [
+      { mutationId: randomUUID(), operation: 'delete', memoryId, baseVersion: 1 },
+    ] });
+    assert.equal(foreignUpdate.body.results[0].status, 'not_found');
+    assert.equal(foreignDelete.body.results[0].status, 'not_found');
+    assert.equal('memory' in foreignUpdate.body.results[0], false);
+    assert.equal((await a.get(`/memories/${memoryId}`)).body.memory.title, null);
   });
 
   it('detects stale multi-device updates and permits a refreshed retry', async () => {
@@ -141,6 +275,36 @@ describe('offline synchronization API', () => {
     assert.equal(retry.body.results[0].version, 3);
   });
 
+  it('rejects stale deletes, soft-deletes at the current version, and keeps duplicate deletes idempotent', async () => {
+    const user = await account(); const owner = api(user); const memoryId = randomUUID();
+    await owner.post('/sync/mutations').send({ mutations: [
+      { mutationId: randomUUID(), operation: 'create', memoryId, memory: newText() },
+    ] });
+    await owner.post('/sync/mutations').send({ mutations: [
+      { mutationId: randomUUID(), operation: 'update', memoryId, baseVersion: 1, patch: { title: 'new version' } },
+    ] });
+    const staleDelete = await owner.post('/sync/mutations').send({ mutations: [
+      { mutationId: randomUUID(), operation: 'delete', memoryId, baseVersion: 1 },
+    ] });
+    assert.equal(staleDelete.status, 409);
+    assert.equal(staleDelete.body.results[0].memory.title, 'new version');
+    assert.equal((await owner.get(`/memories/${memoryId}`)).status, 200);
+    const deletion = { mutationId: randomUUID(), operation: 'delete', memoryId, baseVersion: 2 };
+    const removed = await owner.post('/sync/mutations').send({ mutations: [deletion] });
+    const replay = await owner.post('/sync/mutations').send({ mutations: [deletion] });
+    assert.equal(removed.body.results[0].version, 3);
+    assert.equal(replay.body.results[0].replayed, true);
+    assert.equal(replay.body.results[0].memory.version, 3);
+    assert.equal((await owner.get(`/memories/${memoryId}`)).status, 404);
+    const staleUpdateAfterDelete = await owner.post('/sync/mutations').send({ mutations: [
+      { mutationId: randomUUID(), operation: 'update', memoryId, baseVersion: 2, patch: { title: 'resurrection attempt' } },
+    ] });
+    assert.equal(staleUpdateAfterDelete.status, 409);
+    assert.equal(staleUpdateAfterDelete.body.results[0].memory.deletedAt !== undefined, true);
+    assert.equal((await testPool.query<{ is_deleted: boolean; version: number }>(
+      'SELECT is_deleted,version FROM memories WHERE id=$1', [memoryId])).rows[0]?.is_deleted, true);
+  });
+
   it('serializes concurrent device mutations at one base version', async () => {
     const user = await account();
     const owner = api(user);
@@ -167,6 +331,35 @@ describe('offline synchronization API', () => {
     const firstEvent = events.rows[0]; const secondEvent = events.rows[1];
     assert.ok(firstEvent && secondEvent);
     assert.ok(BigInt(firstEvent.cursor) < BigInt(secondEvent.cursor));
+  });
+
+  it('makes sync-created memories searchable through the existing search index', async () => {
+    const user = await account(); const owner = api(user); const memoryId = randomUUID();
+    const created = await owner.post('/sync/mutations').send({ mutations: [
+      { mutationId: randomUUID(), operation: 'create', memoryId,
+        memory: { ...newText('sync searchable body'), title: 'sync trigger indexed phrase', tags: ['offline-sync-tag'] } },
+    ] });
+    assert.equal(created.status, 200);
+    const search = await owner.get('/memories/search').query({ q: 'trigger indexed' });
+    assert.ok(search.body.memories.some((memory: { id: string }) => memory.id === memoryId));
+  });
+
+  it('keeps revisit server-side while making its versioned event pull-visible', async () => {
+    const user = await account(); const owner = api(user);
+    const created = await owner.post('/memories').send(newText('revisit remains server-side'));
+    assert.equal(created.status, 201);
+    const memoryId = created.body.memory.id as string;
+    const revisit = await owner.post(`/memories/${memoryId}/revisit`);
+    assert.equal(revisit.status, 200);
+    assert.equal(revisit.body.memory.revisitCount, 1);
+    const pulled = await owner.get('/sync/changes').query({ cursor: '0' });
+    assert.deepEqual(pulled.body.changes.map((change: { operation: string }) => change.operation), ['create', 'update']);
+    assert.equal(pulled.body.changes[1].version, 2);
+    assert.equal(pulled.body.changes[1].memory.revisitCount, 1);
+    const rejected = await owner.post('/sync/mutations').send({ mutations: [
+      { mutationId: randomUUID(), operation: 'revisit', memoryId },
+    ] });
+    assert.equal(rejected.status, 400);
   });
 
   it('paginates repeatable per-user cursors and returns deletion tombstones while normal reads stay hidden', async () => {

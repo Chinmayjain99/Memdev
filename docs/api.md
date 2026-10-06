@@ -15,7 +15,7 @@ Successful memory responses use `{ "memory": { ... } }`, except `GET /memories`,
 | `PATCH /memories/:id` | Update allowed metadata using the current version in `If-Match`; return new `ETag`. |
 | `DELETE /memories/:id` | Soft-delete an owned memory; returns `204`. Repeated deletion remains `204`. |
 | `POST /memories/:id/revisit` | Atomically increment server-managed revisit metrics and return the updated memory/version. |
-| `GET /sync/bootstrap` | Return an authenticated initial snapshot and its safe change cursor. |
+| `GET /sync/bootstrap?limit=100&pageToken=...` | Return one authenticated snapshot page and its fixed change boundary. |
 | `GET /sync/changes?cursor=0&limit=100` | Pull this caller’s changes after the cursor (limit 1–500, default 100). |
 | `POST /sync/mutations` | Apply up to 25 authenticated, idempotent create/update/delete mutations. |
 
