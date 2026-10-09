@@ -78,7 +78,7 @@
 ## Phase 7 — API contracts and frontend foundation
 
 - Status: implemented on `codex/frontend-foundation`, based on `origin/develop` at `07c97c0e2657d39a7f1b9bd49f07619979a13a1e`.
-- Added a portable `@memdev/contracts` workspace for JSON request/response, pagination, auth, memory, search, sync, and API error types. Only a shared error-envelope Zod schema is runtime-shared; backend request validation remains authoritative.
+- Added a portable `@memdev/contracts` workspace for JSON request/response, pagination, auth, memory, search, sync, and API error types. Shared Zod schemas validate common response shapes and the error envelope; backend request validation remains authoritative.
 - Added the React/TypeScript/Vite web workspace, centralized native-fetch API modules, in-memory access-token handling and single-flight refresh, basic auth provider, route guards, minimal pages, reusable controls/states, and API/component tests.
 - Clean install: `npm ci` passed; npm workspace resolution links `@memdev/frontend` to `frontend/` and `@memdev/contracts` to `shared/contracts/`.
 - Frontend: `npm run test:frontend` passed (23 tests); `npm run typecheck:frontend`, `npm run lint:frontend`, and `npm run build:frontend` passed.
