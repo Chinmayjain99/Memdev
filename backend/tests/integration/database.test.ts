@@ -1,17 +1,8 @@
 import assert from 'node:assert/strict';
-import { after, before, describe, it } from 'node:test';
+import { before, describe, it } from 'node:test';
 import type { PoolClient } from 'pg';
-import { config } from '../../src/config/index.js';
-import { createPool } from '../../src/database/connection.js';
-import { runMigrations } from '../../src/database/run-migrations.js';
 import { withTransaction } from '../../src/database/transaction.js';
-
-const testConfig = { ...config, DB_NAME: config.DB_TEST_NAME };
-if (testConfig.DB_NAME === config.DB_NAME) {
-  throw new Error('DB_TEST_NAME must be different from DB_NAME; schema tests are restricted to a separate database.');
-}
-
-const testPool = createPool(testConfig);
+import { prepareTestDatabase, testPool } from './test-db.js';
 
 function firstRow<Row>(rows: readonly Row[]): Row {
   const row = rows[0];
@@ -40,25 +31,35 @@ async function withRollback<Result>(operation: (client: PoolClient) => Promise<R
   }
 }
 
-before(async () => runMigrations(testConfig));
-after(async () => testPool.end());
+before(prepareTestDatabase);
 
 describe('database schema', () => {
   it('applies the tracked migration repeatably', async () => {
-    await runMigrations(testConfig);
+    await prepareTestDatabase();
     const result = await testPool.query<{ count: string }>('SELECT count(*)::text AS count FROM schema_migrations');
-    assert.equal(result.rows[0]?.count, '2');
+    assert.equal(result.rows[0]?.count, '4');
   });
 
   it('creates the expected tables, constraints, foreign keys, indexes, and extension', async () => {
+    const authColumns = await testPool.query<{ column_name: string }>(
+      `SELECT column_name FROM information_schema.columns WHERE table_schema=current_schema()
+       AND table_name='users' AND column_name='password_hash'`,
+    );
+    assert.equal(authColumns.rowCount, 1);
+    const rotationColumns = await testPool.query<{ column_name: string }>(
+      `SELECT column_name FROM information_schema.columns WHERE table_schema=current_schema()
+       AND table_name='refresh_sessions' AND column_name=ANY($1::text[])`,
+      [['family_id', 'replaced_by_session_id']],
+    );
+    assert.deepEqual(rotationColumns.rows.map((row) => row.column_name).sort(), ['family_id', 'replaced_by_session_id']);
     const tables = await testPool.query<{ tablename: string }>(
       `SELECT tablename FROM pg_tables
        WHERE schemaname = current_schema()
          AND tablename = ANY($1::text[])`,
-      [['users', 'oauth_accounts', 'refresh_sessions', 'memories', 'memory_changes']],
+      [['users', 'oauth_accounts', 'refresh_sessions', 'memories', 'memory_changes', 'sync_mutations']],
     );
     assert.deepEqual(tables.rows.map(({ tablename }) => tablename).sort(),
-      ['memories', 'memory_changes', 'oauth_accounts', 'refresh_sessions', 'users']);
+      ['memories', 'memory_changes', 'oauth_accounts', 'refresh_sessions', 'sync_mutations', 'users']);
 
     const constraints = await testPool.query<{ conname: string }>(
       `SELECT conname FROM pg_constraint

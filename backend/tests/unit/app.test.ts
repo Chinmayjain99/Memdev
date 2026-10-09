@@ -25,7 +25,7 @@ describe('HTTP foundation', () => {
 
 describe('configuration', () => {
   it('applies defaults and parses valid settings', () => {
-    const config = parseConfig({});
+    const config = parseConfig({ AUTH_JWT_SECRET: 'test-only-secret-that-is-long-enough-32' });
     assert.equal(config.PORT, 4000);
     assert.equal(config.DB_PORT, 5432);
     assert.equal(config.DB_NAME, 'memdev');
