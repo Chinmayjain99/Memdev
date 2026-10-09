@@ -1,6 +1,6 @@
 # MemDev frontend foundation
 
-React 19, TypeScript, Vite, and React Router provide the initial web application. Portable wire types are in `shared/contracts`; API transport is centralized in `src/services/api/` using browser `fetch`. React pages do not issue raw HTTP calls. Backend implementation and PostgreSQL dependencies are not imported into the frontend.
+React 19, TypeScript, Vite, and React Router provide the web application. Portable wire types are in `shared/contracts`; API transport is centralized in `src/services/api/` using browser `fetch`. React pages do not issue raw HTTP calls. Backend implementation and PostgreSQL dependencies are not imported into the frontend.
 
 ## Configure and run
 
@@ -12,7 +12,7 @@ Available frontend checks from the root are `npm run test:frontend`, `npm run ty
 
 The refresh token stays in the backend's HttpOnly cookie. It is never read by JavaScript or written to localStorage, sessionStorage, or IndexedDB. The short-lived access token stays only in the API client's memory. On startup, AuthProvider refreshes through the cookie, then calls `/auth/me`; simultaneous startup and 401 refresh attempts share one promise. Each original request is retried once, and a refresh failure clears the access token and authenticated state. Cookie requests include credentials and `X-Memdev-Request: 1` where required by backend CSRF checks.
 
-Routes include `/login`, `/register`, `/dashboard`, `/memories/:id`, and `/settings`. Protected routes wait for session bootstrap before rendering and redirect unauthenticated users to sign in. This is a user-interface safeguard; server authorization remains authoritative. Current authenticated page contents are placeholders for future product work.
+Routes include `/login`, `/register`, `/dashboard`, `/search`, `/memories/:id`, and `/settings`. Protected routes wait for session bootstrap before rendering and redirect unauthenticated users to sign in. This is a user-interface safeguard; server authorization remains authoritative. The dashboard lists memories using the backend keyset cursor, saves text or URL memories, and offers deletion. Search calls the existing server search endpoint and supports its metadata/date filters. Detail pages record intentional revisits, show complete memory metadata, and edit only fields supported by the backend using version-based `If-Match` checks. Stale edits require a reload before retrying.
 
 ## API contracts and errors
 
@@ -20,4 +20,4 @@ Routes include `/login`, `/register`, `/dashboard`, `/memories/:id`, and `/setti
 
 ## Scope
 
-This is a functional foundation, not a complete dashboard. Persistent browser storage, offline queues, extension integration, semantic search, and deployment are deferred.
+Settings only exposes the currently supported logout and logout-all actions. Persistent browser storage, offline queues, extension integration, semantic search, profile editing, and deployment are deferred.

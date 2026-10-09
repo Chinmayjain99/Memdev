@@ -15,7 +15,7 @@ Browser extension <-> IndexedDB <-> Sync API <-> PostgreSQL
 
 ## Web frontend foundation
 
-The React + TypeScript + Vite client lives in `frontend/`; portable wire contracts live in `shared/contracts/`. The frontend depends on the HTTP contract package, never on Express, PostgreSQL, or backend runtime modules. API calls are centralized in `frontend/src/services/api/` around native `fetch`; feature components do not issue raw requests. The client normalizes HTTP errors, validates shared response shapes, includes credentials for the refresh cookie, and holds the short-lived access token only in memory. React Context supplies the small authentication state; React Router guards UX routes while the backend remains the authorization boundary. Request validation remains server-owned and is not duplicated in the frontend.
+The React + TypeScript + Vite client lives in `frontend/`; portable wire contracts live in `shared/contracts/`. The frontend depends on the HTTP contract package, never on Express, PostgreSQL, or backend runtime modules. API calls are centralized in `frontend/src/services/api/` around native `fetch`; feature components do not issue raw requests. The client normalizes HTTP errors, validates shared response shapes, includes credentials for the refresh cookie, and holds the short-lived access token only in memory. React Context supplies the small authentication state; React Router guards UX routes while the backend remains the authorization boundary. The dashboard, detail editor, and search view reuse memory presentation components and call the existing memory and search API modules. Request validation remains server-owned and is not duplicated in the frontend.
 
 ## Security boundary
 

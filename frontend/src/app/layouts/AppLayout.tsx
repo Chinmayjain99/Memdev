@@ -9,6 +9,7 @@ export function AppLayout() {
       <Link className="brand" to="/dashboard">MemDev</Link>
       <nav aria-label="Main navigation">
         <Link to="/dashboard">Dashboard</Link>
+        <Link to="/search">Search</Link>
         <Link to="/settings">Settings</Link>
       </nav>
       <div className="user-area">
