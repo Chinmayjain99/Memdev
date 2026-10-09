@@ -1,9 +1,16 @@
-import { apiErrorEnvelopeSchema, type ApiErrorKind, type AuthResponse } from '@memdev/contracts';
+import {
+  apiErrorEnvelopeSchema,
+  authResponseSchema,
+  type ApiErrorKind,
+  type AuthResponse,
+  type ContractSchema,
+} from '@memdev/contracts';
 
-type RequestOptions = Omit<RequestInit, 'body'> & {
+type RequestOptions<T> = Omit<RequestInit, 'body'> & {
   body?: unknown;
   authenticated?: boolean;
   retryAuth?: boolean;
+  responseSchema?: ContractSchema<T>;
 };
 
 export class ApiError extends Error {
@@ -42,7 +49,9 @@ export class ApiClient {
 
   refreshSession(): Promise<AuthResponse> {
     if (!this.refreshPromise) {
-      const request = this.request<AuthResponse>('/auth/refresh', { method: 'POST', authenticated: false, retryAuth: false })
+      const request = this.request<AuthResponse>('/auth/refresh', {
+        method: 'POST', authenticated: false, retryAuth: false, responseSchema: authResponseSchema,
+      })
         .then((result) => {
           this.accessToken = result.accessToken;
           return result;
@@ -55,8 +64,8 @@ export class ApiClient {
     return this.refreshPromise;
   }
 
-  async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-    const { body, authenticated = true, retryAuth = true, headers: inputHeaders, ...init } = options;
+  async request<T>(path: string, options: RequestOptions<T> = {}): Promise<T> {
+    const { body, authenticated = true, retryAuth = true, responseSchema, headers: inputHeaders, ...init } = options;
     const headers = new Headers(inputHeaders);
     if (body !== undefined) headers.set('Content-Type', 'application/json');
     if (authenticated && this.accessToken) headers.set('Authorization', `Bearer ${this.accessToken}`);
@@ -82,14 +91,19 @@ export class ApiClient {
       const payload: unknown = await response.json().catch(() => null);
       // Sync deliberately returns per-item outcomes with HTTP 400/409; preserve these results.
       if (path === '/sync/mutations' && (response.status === 400 || response.status === 409)
-        && typeof payload === 'object' && payload !== null && 'results' in payload) return payload as T;
+        && typeof payload === 'object' && payload !== null && 'results' in payload) {
+        return this.validateResponse(payload, response.status, responseSchema);
+      }
       const parsed = apiErrorEnvelopeSchema.safeParse(payload);
       const code = parsed.success ? parsed.data.error.code : `HTTP_${response.status}`;
       const message = parsed.success ? parsed.data.error.message : this.safeFallback(response.status);
       throw new ApiError(response.status, code, message, kindForStatus(response.status));
     }
     if (response.status === 204) return undefined as T;
-    return await response.json() as T;
+    let payload: unknown;
+    try { payload = await response.json(); }
+    catch { throw this.invalidResponse(response.status); }
+    return this.validateResponse(payload, response.status, responseSchema);
   }
 
   private async refreshAccessToken(): Promise<boolean> {
@@ -110,6 +124,17 @@ export class ApiClient {
     if (status === 429) return 'Too many requests. Try again shortly.';
     if (status >= 500) return 'The server encountered an error. Try again later.';
     return `Request failed (${status}).`;
+  }
+
+  private validateResponse<T>(payload: unknown, status: number, schema?: ContractSchema<T>): T {
+    if (!schema) return payload as T;
+    const result = schema.safeParse(payload);
+    if (!result.success) throw this.invalidResponse(status);
+    return result.data;
+  }
+
+  private invalidResponse(status: number): ApiError {
+    return new ApiError(status, 'INVALID_RESPONSE', 'The server returned an unexpected response.', 'unknown');
   }
 }
 

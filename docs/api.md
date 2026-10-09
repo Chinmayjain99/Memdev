@@ -1,6 +1,6 @@
 # MemDev API
 
-The portable TypeScript contracts consumed by the web client live in [`shared/contracts/src/index.ts`](../shared/contracts/src/index.ts). They describe JSON wire values (timestamps are ISO strings), request/response shapes, pagination, search filters, sync outcomes, and the error envelope. The shared package has no backend runtime imports. It uses Zod only to validate the common error envelope at the HTTP boundary; existing backend validators remain the source of server-side request validation.
+The portable TypeScript contracts consumed by the web client live in [`shared/contracts/src/index.ts`](../shared/contracts/src/index.ts). They describe JSON wire values (timestamps are ISO strings), request/response shapes, pagination, search filters, sync outcomes, and the error envelope. Small shared Zod schemas validate common successful response shapes and the error envelope at the HTTP boundary. The shared package has no backend runtime imports; existing backend validators remain the source of server-side request validation.
 
 ## Authentication
 

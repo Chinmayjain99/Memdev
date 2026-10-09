@@ -16,7 +16,7 @@ Routes include `/login`, `/register`, `/dashboard`, `/memories/:id`, and `/setti
 
 ## API contracts and errors
 
-`shared/contracts` describes authentication, memory, search, pagination, and sync requests/responses using JSON-safe timestamps. Zod validates the shared API error envelope; backend validators remain server-owned to avoid duplicating full schemas. The client maps HTTP failures to a typed `ApiError` and avoids exposing transport internals in network errors. `/sync/mutations` 400/409 bodies with per-item results are preserved for partial processing.
+`shared/contracts` describes authentication, memory, search, pagination, and sync requests/responses using JSON-safe timestamps. Shared Zod schemas validate response shapes and the error envelope at the HTTP boundary; backend validators remain server-owned to avoid duplicating request schemas. The client maps HTTP failures to a typed `ApiError` and avoids exposing transport internals in network errors. `/sync/mutations` 400/409 bodies with per-item results are schema-checked and preserved for partial processing.
 
 ## Scope
 

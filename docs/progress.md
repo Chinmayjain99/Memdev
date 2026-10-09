@@ -81,8 +81,7 @@
 - Added a portable `@memdev/contracts` workspace for JSON request/response, pagination, auth, memory, search, sync, and API error types. Only a shared error-envelope Zod schema is runtime-shared; backend request validation remains authoritative.
 - Added the React/TypeScript/Vite web workspace, centralized native-fetch API modules, in-memory access-token handling and single-flight refresh, basic auth provider, route guards, minimal pages, reusable controls/states, and API/component tests.
 - Clean install: `npm ci` passed; npm workspace resolution links `@memdev/frontend` to `frontend/` and `@memdev/contracts` to `shared/contracts/`.
-- Frontend: `npm run test:frontend` passed (22 tests); `npm run typecheck:frontend`, `npm run lint:frontend`, and `npm run build:frontend` passed.
+- Frontend: `npm run test:frontend` passed (23 tests); `npm run typecheck:frontend`, `npm run lint:frontend`, and `npm run build:frontend` passed.
 - Backend regression check: `npm test` passed (47 tests, using only `memdev_test`); `npm run typecheck`, `npm run lint`, and `npm run build` passed.
 - Dependency audit: `npm audit` passed with 0 vulnerabilities.
 - No backend business code changed. Full dashboard, IndexedDB, browser extension, semantic search, and deployment remain deferred.
-- Commit and feature-branch push status are recorded after publication.
