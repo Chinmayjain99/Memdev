@@ -74,3 +74,15 @@
 - Final review hardened idempotency fingerprints for transformed dates and ensures state-dependent invalid mutations do not hide other per-item batch outcomes. Added tests for concurrent same-ID retries, bounded bootstrap paging/races, partial batches, dependent batch ordering, stale/duplicate deletes, revisit pull behavior, and search indexing.
 - Bootstrap is bounded and statelessly paginated; every page carries the first page's locked cursor boundary, and clients pull later changes after applying all pages.
 - Feature branch pushed to `origin/codex/backend-sync`; no PR was created and no merge was performed.
+
+## Phase 7 — API contracts and frontend foundation
+
+- Status: implemented on `codex/frontend-foundation`, based on `origin/develop` at `07c97c0e2657d39a7f1b9bd49f07619979a13a1e`.
+- Added a portable `@memdev/contracts` workspace for JSON request/response, pagination, auth, memory, search, sync, and API error types. Only a shared error-envelope Zod schema is runtime-shared; backend request validation remains authoritative.
+- Added the React/TypeScript/Vite web workspace, centralized native-fetch API modules, in-memory access-token handling and single-flight refresh, basic auth provider, route guards, minimal pages, reusable controls/states, and API/component tests.
+- Clean install: `npm ci` passed; npm workspace resolution links `@memdev/frontend` to `frontend/` and `@memdev/contracts` to `shared/contracts/`.
+- Frontend: `npm run test:frontend` passed (22 tests); `npm run typecheck:frontend`, `npm run lint:frontend`, and `npm run build:frontend` passed.
+- Backend regression check: `npm test` passed (47 tests, using only `memdev_test`); `npm run typecheck`, `npm run lint`, and `npm run build` passed.
+- Dependency audit: `npm audit` passed with 0 vulnerabilities.
+- No backend business code changed. Full dashboard, IndexedDB, browser extension, semantic search, and deployment remain deferred.
+- Commit and feature-branch push status are recorded after publication.

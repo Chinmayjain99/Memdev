@@ -1,5 +1,30 @@
 # MemDev API
 
+The portable TypeScript contracts consumed by the web client live in [`shared/contracts/src/index.ts`](../shared/contracts/src/index.ts). They describe JSON wire values (timestamps are ISO strings), request/response shapes, pagination, search filters, sync outcomes, and the error envelope. The shared package has no backend runtime imports. It uses Zod only to validate the common error envelope at the HTTP boundary; existing backend validators remain the source of server-side request validation.
+
+## Authentication
+
+Cookie-authenticated auth actions include `X-Memdev-Request: 1`. The browser also sends its `Origin`; the server validates both and its credentialed CORS policy allows only configured `AUTH_WEB_ORIGIN`. The frontend uses `credentials: "include"`. The refresh token is issued only as the `HttpOnly`, `SameSite=Lax` `memdev_refresh` cookie scoped to `/auth`; it is never included in JSON or readable by browser JavaScript.
+
+| Method and path | Behavior |
+| --- | --- |
+| `POST /auth/register` | Validates email and password (minimum 12 characters, maximum 72 UTF-8 bytes); returns `201 { user, accessToken, expiresIn }` and sets the refresh cookie. |
+| `POST /auth/login` | Returns `{ user, accessToken, expiresIn }` and sets/rotates the refresh cookie. |
+| `POST /auth/refresh` | Uses the refresh cookie and returns a new `{ user, accessToken, expiresIn }`; invalid refresh clears the cookie. |
+| `POST /auth/logout` | Revokes the current refresh session when present, clears cookie, and returns `204`. |
+| `POST /auth/logout-all` | Requires a bearer access token, revokes all sessions, clears cookie, and returns `204`. |
+| `GET /auth/me` | Requires a bearer token; returns `{ user }`. |
+
+The client keeps only the short-lived access token in JavaScript memory. On application startup it attempts refresh and then loads `/auth/me`. If an authenticated API call receives `401`, the client shares one in-flight refresh among callers and retries each original call at most once. Failed refresh clears client authentication state. No browser persistent storage is used for credentials.
+
+## CORS and request credentials
+
+`backend/src/app.ts` enables credentialed CORS only for configured `AUTH_WEB_ORIGIN`, allows `Content-Type`, `Authorization`, `If-Match`, and `X-Memdev-Request`, and does not allow wildcard origins with credentials. Set the local frontend origin to backend `AUTH_WEB_ORIGIN` (default `http://localhost:5173`). Set `VITE_API_BASE_URL` to the backend origin in the local frontend environment.
+
+## HTTP errors
+
+Errors use `{ "error": { "code": string, "message": string } }`. The frontend maps status `401` to unauthenticated, `403` to forbidden, `400`/`422` to validation, `428` to a missing precondition, `404` to not found, `409` to conflict, `429` to rate limited, and `5xx` to server errors. The server emits generic unexpected-error messages and does not return SQL details. `/sync/mutations` is intentionally special: HTTP `400`/`409` may carry `{ results }` with per-mutation `invalid`/`conflict` outcomes; clients must preserve and process that body instead of discarding it as a request-wide exception.
+
 All memory endpoints require `Authorization: Bearer <access-token>`. The identity is taken from the verified token subject (`request.auth.id`); request bodies and query parameters cannot select an owner. Memory request schemas reject unknown fields, including `user_id` and server-managed fields.
 
 Successful memory responses use `{ "memory": { ... } }`, except `GET /memories`, which returns `{ "memories": [...], "hasMore": boolean, "nextCursor": string | null }`. Memory objects use camelCase and include `id`, `captureType`, editable/content metadata, `createdAt`, `updatedAt`, `clientCreatedAt`, revisit metadata, and `version`. They omit `user_id`, deletion internals, and `search_vector`.
@@ -49,4 +74,4 @@ Errors use `{ "error": { "code": string, "message": string } }`. Invalid fields,
 
 ## Deferred phases
 
-Semantic/vector search, frontend, browser extension, OAuth providers, and deployment remain deferred. The API uses the existing database-managed `search_vector` for lexical search and never exposes it.
+Semantic/vector search, full dashboard functionality, browser extension, OAuth providers, and deployment remain deferred. The API uses the existing database-managed `search_vector` for lexical search and never exposes it.
